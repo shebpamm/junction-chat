@@ -5,6 +5,7 @@ const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server);
 const axios = require('axios');
+const config = require('./config.json');
 
 
 const APP_PORT = process.env.PORT || 8080;
