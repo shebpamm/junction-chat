@@ -5,15 +5,13 @@ const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server);
 
-io.on('connection', (socket) => {
-  console.log('a user connected');
-});
-
 const APP_PORT = process.env.PORT || 8080;
 
-app.get('/', (req, res) => {
-    res.send('Hello World!');
-});
+app.use('/', express.static(__dirname + '/front'));
+
+function publishMessage(message) {
+    
+}
 
 io.on('connection', (socket) => {
     console.log('a user connected');
@@ -22,7 +20,9 @@ io.on('connection', (socket) => {
         });
 
     socket.on('chat message', (msg) => {
+        data = publishMessage(msg);
         io.emit('chat message', msg);
+        console.log(msg.username + ': ' + msg.message);
     });
 });
 
