@@ -11,6 +11,27 @@ const APP_PORT = process.env.PORT || 8080;
 
 app.use('/', express.static(__dirname + '/front'));
 
+async function getTransformedMessage(message) {
+    const body = {
+        "prompt": `This turns negative messages into emphatic positive ones.\n\nNegative message: ${ message.message }\nPositive message:`,
+        "temperature": 0,
+        "max_tokens": 60,
+        "top_p": 1,
+        "frequency_penalty": 0,
+        "presence_penalty": 0,
+        "stop": ["\n"]
+      }
+      const transformedMessage = await axios.post('https://api.openai.com/v1/engines/curie/completions', body, {
+        headers: {
+            'Authorization': `Bearer ${ config.openai_key }`
+        }
+      });
+      console.log(body);
+      message.message = transformedMessage.data.choices[0].text;
+      console.log(transformedMessage.data);
+      return message;
+}
+
 function publishMessage(message) {
     return axios.post(
         'https://us-central1-junction-2021-fee21.cloudfunctions.net/webApi/api/v1/message',
@@ -35,9 +56,15 @@ io.on('connection', async (socket) => {
         });
 
     socket.on('chat message', async (msg) => {
-        data = await publishMessage(msg);
-        io.emit('chat message', data.data);
-        console.log(msg.username + ': ' + msg.message);
+        const transformedMessage = await getTransformedMessage(msg);
+        console.log(transformedMessage);
+        data = await publishMessage(transformedMessage);
+        const sendableMessage = {
+            id: data.data.id,
+            data: data.data
+        }
+        //console.log(sendableMessage)
+        io.emit('chat message', sendableMessage);
     });
 });
 
