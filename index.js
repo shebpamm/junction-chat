@@ -48,7 +48,10 @@ io.on('connection', async (socket) => {
     console.log('a user connected');
 
     const messages = await getMessages();
-    for (const message of messages.data) {
+    const sortedMessages = messages.data.sort((a, b) => {
+        return a.createdAt > b.createAt ? 1 : -1;
+    });
+    for (const message of sortedMessages) {
         socket.emit('chat message', message);
     }
 
