@@ -77,8 +77,12 @@ io.on('connection', async (socket) => {
     console.log('a user connected');
 
     const messages = await getMessages();
-    const sortedMessages = messages.data.sort();
-    for (const message of sortedMessages) {
+    const sortedMessages = messages.data.sort((a, b) => {
+        return new Date(a.data.createdAt) - new Date(b.data.createdAt);
+    });
+
+    for (let i = 0; i < sortedMessages.length; i++) {
+        const message = sortedMessages[i];
         socket.emit('chat message', message);
     }
 
