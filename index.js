@@ -12,6 +12,37 @@ const APP_PORT = process.env.PORT || 8080;
 
 app.use('/', express.static(__dirname + '/front'));
 
+async function isMessageInappropriate(message) {
+    const body = {
+        "prompt": "<|endoftext|>"+message.message+"\n--\nLabel:",
+        "temperature": 0,
+        "max_tokens": 1,
+        "top_p": 1,
+        "frequency_penalty": 0,
+        "presence_penalty": 0,
+        "logprobs": 10
+    }
+
+    const openaiResponse = await axios.post('https://api.openai.com/v1/engines/content-filter-alpha/completions', body, {
+        headers: {
+            'Authorization': 'Bearer ' + config.openai_key
+        }
+    });
+
+    console.log(openaiResponse.data.choices[0].logprobs.top_logprobs);
+
+    if (openaiResponse.data.choices[0].text === '0' || openaiResponse.data.choices[0].text === '1') {
+        return false;
+    } else {
+        if (openaiResponse.data.choices[0].text === '2') {
+            const logprobs = openaiResponse.data.choices[0].logprobs.top_logprobs[0]
+            if (logprobs["2"] > -0.355) {
+                return true;
+            }
+        }
+    }
+}
+
 async function getTransformedMessage(message) {
     const body = {
         "prompt": `This turns negative messages into emphatic positive ones.\n\nNegative message: ${ message.message }\nPositive message:`,
@@ -27,9 +58,7 @@ async function getTransformedMessage(message) {
             'Authorization': `Bearer ${ config.openai_key }`
         }
       });
-      console.log(body);
       message.message = transformedMessage.data.choices[0].text;
-      console.log(transformedMessage.data);
       return message;
 }
 
@@ -48,9 +77,7 @@ io.on('connection', async (socket) => {
     console.log('a user connected');
 
     const messages = await getMessages();
-    const sortedMessages = messages.data.sort((a, b) => {
-        return a.createdAt > b.createAt ? 1 : -1;
-    });
+    const sortedMessages = messages.data.sort();
     for (const message of sortedMessages) {
         socket.emit('chat message', message);
     }
@@ -60,14 +87,17 @@ io.on('connection', async (socket) => {
         });
 
     socket.on('chat message', async (msg) => {
+
+        if (await isMessageInappropriate(msg)) {
+            io.emit('inappropriate message');
+        }
+
         const transformedMessage = await getTransformedMessage(msg);
-        console.log(transformedMessage);
         data = await publishMessage(transformedMessage);
         const sendableMessage = {
             id: data.data.id,
             data: data.data
         }
-        //console.log(sendableMessage)
         io.emit('chat message', sendableMessage);
     });
 });
